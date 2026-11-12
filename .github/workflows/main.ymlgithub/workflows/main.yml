@@ -1,0 +1,58 @@
+
+name: Build SKIMI Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip build-essential \
+            libffi-dev libssl-dev zlib1g-dev \
+            libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake autoconf libtool \
+            pkg-config python3-pip python3-venv
+
+      - name: Extract SKIMI ZIP
+        run: |
+          mkdir -p _skimi_src
+          unzip -o SKIMI_Fresh_Start.zip -d _skimi_src
+          SPEC=$(find _skimi_src -name buildozer.spec -print -quit)
+          if [ -z "$SPEC" ]; then
+            echo "ERROR: buildozer.spec not found"
+            exit 1
+          fi
+          echo "APP_DIR=$(dirname "$SPEC")" >> "$GITHUB_ENV"
+
+      - name: Install Buildozer
+        run: |
+          python3 -m pip install --user --upgrade pip
+          python3 -m pip install --user buildozer cython
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build debug APK
+        run: |
+          cd "$APP_DIR"
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SKIMI-debug-APK
+          path: _skimi_src/**/bin/*.apk
+          if-no-files-found: error
